@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Віртуальна лабораторна: вимірювання маси тіл</title>
+<style>
+:root{--bg:#eef2f6;--panel:#ffffff;--text:#1d2733;--muted:#5b6b7b;--accent:#1f6feb;--bad:#c62828;--line:#d0d7de;--scene:#e8eef5;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#141a21;--panel:#1d2530;--text:#e6edf3;--muted:#9aa7b4;--accent:#58a6ff;--bad:#ff7b72;--line:#33404d;--scene:#1a222c}}
+:root[data-theme="dark"]{--bg:#141a21;--panel:#1d2530;--text:#e6edf3;--muted:#9aa7b4;--accent:#58a6ff;--bad:#ff7b72;--line:#33404d;--scene:#1a222c}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:10px 16px}
+h1{font-size:18px;margin:0}
+header p{margin:2px 0 0;color:var(--muted);font-size:13px}
+#view{margin:0 12px 16px;height:78vh;height:78dvh;min-height:420px;background:var(--panel);border:1px solid var(--line);border-radius:12px;position:relative;overflow:hidden;touch-action:none;cursor:grab}
+#view canvas{width:100%;height:100%;display:block}
+#toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:var(--panel);color:var(--bad);border:1px solid var(--bad);border-radius:8px;padding:6px 12px;font-size:13px;display:none;pointer-events:none}
+#reset{position:absolute;right:10px;top:10px;font:inherit;font-size:13px;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+#reset:hover{border-color:var(--accent)}
+@media (max-aspect-ratio:1/1){#view{height:74dvh;margin:0 6px 10px}header{padding:8px 10px}h1{font-size:16px}}
+</style>
+</head>
+<body>
+<header>
+<h1>Лабораторна робота «Вимірювання маси тіл» — віртуальні терези</h1>
+<p>Перетягуйте тіла й гирьки мишкою (або пальцем) на шальки. Порожнє місце — обертання сцени, коліщатко — масштаб.</p>
+</header>
+<div id="view"><div id="toast"></div><button id="reset">Скинути все</button></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+var T=THREE,view=document.getElementById('view'),toastEl=document.getElementById('toast');
+var renderer=new T.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+view.insertBefore(renderer.domElement,view.firstChild);
+var scene=new T.Scene();
+function applyBg(){var c=getComputedStyle(document.documentElement).getPropertyValue('--scene').trim();scene.background=new T.Color(c||'#e8eef5')}
+applyBg();matchMedia('(prefers-color-scheme: dark)').addEventListener('change',function(){setTimeout(applyBg,50)});
+var cam=new T.PerspectiveCamera(40,1,0.1,100);
+var th=0,ph=1.05,rad=15;
+var tz=2;function setCam(){cam.position.set(rad*Math.sin(ph)*Math.sin(th),1.4+rad*Math.cos(ph),tz+rad*Math.sin(ph)*Math.cos(th));cam.lookAt(0,1.3,tz)}
+scene.add(new T.AmbientLight(0xffffff,0.7));
+var dl=new T.DirectionalLight(0xffffff,0.8);dl.position.set(4,10,8);scene.add(dl);
+var M=function(c,o){return new T.MeshStandardMaterial(Object.assign({color:c,roughness:.55,metalness:.1},o||{}))};
+var table=new T.Mesh(new T.BoxGeometry(22,0.3,18),M(0xb08a5a));table.position.set(0,-0.15,4);scene.add(table);
+var trays=[];function tray(){var t=new T.Mesh(new T.BoxGeometry(6.6,0.12,2.8),M(0x3f5266,{roughness:.8}));scene.add(t);trays.push(t)}
+tray();tray();
+// balance
+var base=new T.Mesh(new T.BoxGeometry(2.6,0.3,1.4),M(0x3b4a57));base.position.y=0.15;scene.add(base);
+var pil=new T.Mesh(new T.CylinderGeometry(0.12,0.16,3.2,16),M(0x56697a,{metalness:.5}));pil.position.y=1.8;scene.add(pil);
+var L=2.8,PY=3.4,HL=1.8,PR=1.25;
+var beam=new T.Group();beam.position.set(0,PY,0);scene.add(beam);
+beam.add(new T.Mesh(new T.BoxGeometry(L*2,0.12,0.18),M(0x8794a1,{metalness:.7,roughness:.35})));
+var needle=new T.Mesh(new T.ConeGeometry(0.06,1,8),M(0xc62828));needle.position.set(0,-0.55,0.26);needle.rotation.x=Math.PI;beam.add(needle);var brk=new T.Mesh(new T.BoxGeometry(0.08,0.08,0.3),M(0x56697a,{metalness:.5}));brk.position.set(0,0,0.14);beam.add(brk);
+var m1=new T.Mesh(new T.BoxGeometry(0.5,0.03,0.05),M(0x222222));m1.position.set(0,PY-1.1,0.2);scene.add(m1);
+var m2=new T.Mesh(new T.BoxGeometry(0.03,0.3,0.05),M(0x222222));m2.position.set(0,PY-1.1,0.2);scene.add(m2);
+function mkPan(){var g=new T.Group();g.add(new T.Mesh(new T.CylinderGeometry(PR,PR*0.85,0.1,40),M(0xdde3e8,{metalness:.5,roughness:.3})));return g}
+var pans=[mkPan(),mkPan()];scene.add(pans[0],pans[1]);
+var strMat=new T.LineBasicMaterial({color:0x888888});
+function mkStr(){var g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(new Float32Array(18),3));var l=new T.LineSegments(g,strMat);l.frustumCulled=false;scene.add(l);return l}
+var strs=[mkStr(),mkStr()];
+// meshes
+function mesh(id){
+var g=new T.Group(),m;
+if(id=='apple'){m=new T.Mesh(new T.SphereGeometry(0.36,24,18),M(0xc0392b));m.scale.y=0.9;m.position.y=0.32;g.add(m);var s=new T.Mesh(new T.CylinderGeometry(0.015,0.015,0.14,6),M(0x5a3b1e));s.position.y=0.68;g.add(s)}
+else if(id=='phone'){m=new T.Mesh(new T.BoxGeometry(0.42,0.07,0.86),M(0x1b1f24,{metalness:.5,roughness:.3}));m.position.y=0.035;g.add(m);var sc=new T.Mesh(new T.BoxGeometry(0.37,0.005,0.78),M(0x0d3b66,{roughness:.2,metalness:.3}));sc.position.y=0.072;g.add(sc);var c=new T.Mesh(new T.CylinderGeometry(0.04,0.04,0.012,12),M(0x444a52));c.position.set(-0.1,0.074,-0.33);g.add(c)}
+else if(id=='stone'){m=new T.Mesh(new T.IcosahedronGeometry(0.4,1),M(0x8a8f94,{roughness:.95}));m.scale.set(1.2,0.6,0.9);m.position.y=0.24;g.add(m)}
+else if(id=='egg'){m=new T.Mesh(new T.SphereGeometry(0.3,24,18),M(0xf2e6d0));m.scale.set(0.85,1.2,0.85);m.position.y=0.36;g.add(m)}
+else if(id=='tennis'){m=new T.Mesh(new T.SphereGeometry(0.33,28,20),M(0xd4e234,{roughness:.9}));m.position.y=0.33;g.add(m);
+for(var k=0;k<2;k++){var r=new T.Mesh(new T.TorusGeometry(0.335,0.012,6,40),M(0xffffff));r.position.y=0.33;r.rotation.y=k?1.1:-1.1;r.rotation.x=Math.PI/2.6;g.add(r)}}
+else{m=new T.Mesh(new T.CylinderGeometry(0.34,0.28,0.85,24,1,true),M(0xcfe8f5,{transparent:true,opacity:.35,side:T.DoubleSide}));m.position.y=0.425;g.add(m);
+var b=new T.Mesh(new T.CylinderGeometry(0.28,0.28,0.04,24),M(0xcfe8f5,{transparent:true,opacity:.5}));b.position.y=0.02;g.add(b);
+if(id=='wglass'){var w=new T.Mesh(new T.CylinderGeometry(0.31,0.28,0.4,24),M(0x3b8fd9,{transparent:true,opacity:.7}));w.position.y=0.22;g.add(w)}}
+return g}
+var fmt=function(x){return (Math.round(x*10)/10).toString().replace('.',',')};
+function label(v){var c=document.createElement('canvas');c.width=c.height=128;var x=c.getContext('2d');x.fillStyle='#c9ced4';x.fillRect(0,0,128,128);x.fillStyle='#111';x.font='bold 40px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(fmt(v),64,52);x.font='bold 32px sans-serif';x.fillText('г',64,92);return new T.CanvasTexture(c)}
+function wmesh(v){var r=0.12+0.06*Math.pow(v,0.33),h=r*0.9+0.06;var g=new T.Group();
+var side=M(0xc9ced4,{metalness:.85,roughness:.3});
+var b=new T.Mesh(new T.CylinderGeometry(r,r*1.05,h,28),[side,new T.MeshStandardMaterial({map:label(v),roughness:.4,metalness:.5}),side]);b.position.y=h/2;g.add(b);return g}
+var DEF=[['apple',85],['phone',150],['stone',85],['egg',65.5],['tennis',57],['wglass',165],['eglass',112]];
+var WV=[100,50,20,20,10,5,2,1,0.5,0.2,0.2,0.1];
+var items=[];
+DEF.forEach(function(d,i){var g=mesh(d[0]);items.push({g:g,m:d[1],where:-1,slot:-1,home:new T.Vector3(0,0.12,0)})});
+WV.forEach(function(v,i){var g=wmesh(v);items.push({g:g,m:v,where:-1,slot:-1,home:new T.Vector3(0,0.12,0)})});
+items.forEach(function(it){it.g.userData.item=it;it.g.position.copy(it.home);scene.add(it.g)});
+function layout(p){var no=DEF.length;items.forEach(function(it,k){var i=k<no?k:k-no,x,z;if(k<no){if(p){x=i<4?-3+i*2:-2+(i-4)*2;z=i<4?3.3:4.5}else{x=-6.2+(i%4)*1.5+(i>3?0.75:0);z=i<4?3.05:4.2}}else{if(p){x=(i%6-2.5)*1.45;z=i<6?6.3:7.5}else{x=1.1+(i%6)*0.95;z=i<6?3.05:4.2}}it.home.set(x,0.12,z);if(it.where==-1)it.g.position.copy(it.home)});
+trays[0].position.set(p?0:-3.6,0.06,p?3.9:3.6);trays[0].scale.x=p?1.3:1;trays[1].position.set(p?0:3.6,0.06,p?6.9:3.6);trays[1].scale.x=p?1.3:1}
+var slots=[];for(var c=0;c<4;c++)for(var r=0;r<3;r++)slots.push([(c-1.5)*0.6,(r-1)*0.6]);
+slots.sort(function(a,b){return Math.hypot(a[0],a[1])-Math.hypot(b[0],b[1])});
+function panMass(p){return items.reduce(function(s,it){return s+(it.where==p?it.m:0)},0)}
+function freeSlot(p){for(var i=0;i<slots.length;i++){if(!items.some(function(it){return it.where==p&&it.slot==i}))return i}return -1}
+function toTray(it){it.where=-1;it.slot=-1;scene.attach(it.g);it.g.position.copy(it.home)}
+function toast(t){toastEl.textContent=t;toastEl.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(function(){toastEl.style.display='none'},2200)}
+document.getElementById('reset').onclick=function(){items.forEach(toTray)};
+// spring
+var ang=0,vel=0;
+function target(){var d=panMass(0)-panMass(1);if(Math.abs(d)<0.05)return 0;return Math.max(-0.3,Math.min(0.3,d*0.04+Math.sign(d)*0.01))}
+function upd(){
+var cs=Math.cos(ang),sn=Math.sin(ang);
+var ends=[[-L*cs,PY-L*sn],[L*cs,PY+L*sn]];
+for(var k=0;k<2;k++){var e=ends[k];pans[k].position.set(e[0],e[1]-HL,0);
+var p=strs[k].geometry.attributes.position,n=0;
+for(var i=0;i<3;i++){var t=i*2.094;p.setXYZ(n++,e[0],e[1],0);p.setXYZ(n++,e[0]+PR*Math.cos(t),e[1]-HL,PR*Math.sin(t))}
+p.needsUpdate=true}
+beam.rotation.z=ang}
+function loop(){vel+=(target()-ang)*0.04;vel*=0.9;ang+=vel;upd();renderer.render(scene,cam);requestAnimationFrame(loop)}
+function resize(){var w=view.clientWidth,h=view.clientHeight;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();var port=cam.aspect<1.1;layout(port);var t=Math.tan(20*Math.PI/180)*cam.aspect;rad=Math.max(port?13:15,(port?5.0:7.6)/t);ph=port?0.95:1.05;tz=port?4.2:2;setCam()}
+addEventListener('resize',resize);
+// interaction
+var ray=new T.Raycaster(),ndc=new T.Vector2(),plane=new T.Plane(new T.Vector3(0,1,0),-2.4),hit=new T.Vector3();
+var held=null,orbit=null,dom=renderer.domElement;
+function setRay(e){var r=dom.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(ndc,cam)}
+function moveHeld(){if(ray.ray.intersectPlane(plane,hit)){held.g.position.set(hit.x,2.4,hit.z)}}
+dom.addEventListener('pointerdown',function(e){
+setRay(e);dom.setPointerCapture(e.pointerId);
+var hs=ray.intersectObjects(items.map(function(i){return i.g}),true);
+var pk=null;if(hs.length){var o=hs[0].object;while(o&&!o.userData.item)o=o.parent;if(o)pk=o.userData.item}
+if(!pk){var pl=new T.Plane(new T.Vector3(0,1,0),-0.4),q=new T.Vector3(),bd=0.6;if(ray.ray.intersectPlane(pl,q)){items.forEach(function(it){if(it.where==-1){var d=Math.hypot(it.g.position.x-q.x,it.g.position.z-q.z);if(d<bd){bd=d;pk=it}}})}}
+if(pk){held=pk;held.where=-1;held.slot=-1;scene.attach(held.g);moveHeld();view.style.cursor='grabbing';return}
+orbit=[e.clientX,e.clientY];view.style.cursor='grabbing'});
+dom.addEventListener('pointermove',function(e){
+if(held){setRay(e);moveHeld();return}
+if(orbit){th-=(e.clientX-orbit[0])*0.006;ph=Math.max(0.5,Math.min(1.5,ph-(e.clientY-orbit[1])*0.006));orbit=[e.clientX,e.clientY];setCam()}});
+function release(){
+view.style.cursor='grab';orbit=null;
+if(!held)return;
+var it=held;held=null;
+var best=-1,bd=1e9;
+for(var k=0;k<2;k++){var d=Math.hypot(it.g.position.x-pans[k].position.x,it.g.position.z-pans[k].position.z);if(d<bd){bd=d;best=k}}
+if(bd<PR+0.15){
+if(panMass(best)+it.m>200.05){toast('Перевантаження! Максимальне навантаження терезів — 200 г');toTray(it);return}
+var s=freeSlot(best);if(s<0){toast('На шальці немає місця');toTray(it);return}
+it.where=best;it.slot=s;pans[best].attach(it.g);it.g.position.set(slots[s][0],0.05,slots[s][1]);it.g.rotation.set(0,0,0)
+}else toTray(it)}
+dom.addEventListener('pointerup',release);
+dom.addEventListener('pointercancel',release);
+dom.addEventListener('wheel',function(e){e.preventDefault();rad=Math.max(8,Math.min(45,rad+e.deltaY*0.01));setCam()},{passive:false});
+setCam();resize();loop();
+})();
+</script>
+</body>
+</html>
